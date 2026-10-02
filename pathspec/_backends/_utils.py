@@ -5,10 +5,12 @@ WARNING: The *pathspec._backends* package is not part of the public API. Its
 contents and structure are likely to change.
 """
 
+import re
 from collections.abc import (
 	Iterable)
 from typing import (
-	TypeVar)
+	TypeVar,
+	Union)  # Replaced by `X | Y` in 3.10.
 
 from pathspec.pattern import (
 	Pattern)
@@ -43,3 +45,20 @@ def enumerate_patterns(
 		out_patterns.reverse()
 
 	return out_patterns
+
+
+def translate_end_anchor(regex: Union[str, bytes]) -> Union[str, bytes]:
+	"""
+	Translate Python's strict end anchor for the native regex backends.
+
+	*regex* (:class:`str` or :class:`bytes`) is the Python regular expression.
+
+	RE2 does not support ``\\Z``, and Hyperscan permits a final newline before
+	``\\Z``. Both use ``\\z`` for the strict end-of-string assertion. Escaped
+	backslashes must remain unchanged, including a literal ``\\Z`` in a name.
+
+	Returns the translated regular expression with the same type as *regex*.
+	"""
+	if isinstance(regex, bytes):
+		return re.sub(rb'\\[\\Z]', lambda m: rb'\z' if m[0] == rb'\Z' else m[0], regex)
+	return re.sub(r'\\[\\Z]', lambda m: r'\z' if m[0] == r'\Z' else m[0], regex)
